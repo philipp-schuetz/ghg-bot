@@ -1,8 +1,8 @@
 import lightbulb
 import configparser
-
+import sqlite3
 import time
-import datetime
+from datetime import datetime
 
 config = configparser.ConfigParser()
 config.read("config.ini")
@@ -15,6 +15,39 @@ web_links = {
     "fehlzeiten": "https://www.herwegh-gymnasium.de/organisation/formulare/schueler/Entschuldigungszettel.pdf",
 }
 
+con = sqlite3.connect("bot-database.db")
+cur = con.cursor()
+
+def get_events(cur):
+    result = cur.execute("SELECT title, description, timestamp FROM events")
+    res_list = result.fetchall()
+
+    res_str = ""
+    i = 0
+    for event in res_list:
+        for column in event:
+            if isinstance(column, int):
+                column = datetime.fromtimestamp(column).strftime("%d/%m/%Y") 
+            if i == 0 or i == 2:
+                column = "*" + column + "*"
+            res_str += column
+            res_str += " "
+            i += 1
+        res_str += "\n"
+        i = 0
+    
+    return res_str
+
+def add_event(title:str, description:str, date:str, con, cur):
+    timestamp = time.mktime(datetime.strptime(date, "%d/%m/%Y").timetuple())
+    cur.execute(f"INSERT INTO events (title, description, timestamp) VALUES (?, ?, ?)", (title, description, timestamp))
+    con.commit()
+    
+def del_event(title, con, cur):
+    cur.execute(f"DELETE FROM events WHERE title=?", (title))
+    con.commit()
+    
+
 @bot.command
 @lightbulb.option("seite", "/help für info", type=str)
 @lightbulb.command("website", "Generiert Website Link")
@@ -26,6 +59,31 @@ async def website(ctx):
         return "keine mögliche Option"
     await ctx.respond(website_link)
 
+
+@bot.command
+@lightbulb.command("events", "Zeigt zukünftige Events an")
+@lightbulb.implements(lightbulb.SlashCommand)
+async def events(ctx):
+    response = get_events(cur)
+    await ctx.respond(response)
+
+@bot.command
+@lightbulb.option("title", "Event Titel", type=str)
+@lightbulb.option("description", "Event Beschreibung", type=str)
+@lightbulb.option("date", "Event Datum (Format: 01/01/2000))", type=str)
+@lightbulb.command("addevent", "Fügt Event hinzu")
+@lightbulb.implements(lightbulb.SlashCommand)
+async def addevent(ctx):
+    add_event(ctx.options.title, ctx.options.description, ctx.options.date, con, cur)
+
+@bot.command
+@lightbulb.option("title", "Event Titel", type=str)
+@lightbulb.command("delevent", "Löscht Event")
+@lightbulb.implements(lightbulb.SlashCommand)
+async def delevent(ctx):
+    del_event(ctx.options.title, con, cur)
+    await ctx.respond(f"Event '{ctx.options.title}' gelöscht")
+
 @bot.command
 @lightbulb.command("help", "hilfe zu commands")
 @lightbulb.implements(lightbulb.SlashCommand)
@@ -36,6 +94,5 @@ async def help(ctx):
     \u2022 fehlzeiten: Fehlzeiten Formular
     """
     await ctx.respond(response)
-
 
 bot.run()

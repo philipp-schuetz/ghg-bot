@@ -1,5 +1,4 @@
-from typing import Optional
-import configparser
+import os
 import sqlite3
 import time
 from datetime import datetime
@@ -9,11 +8,8 @@ from discord import app_commands
 
 
 
-
-config = configparser.ConfigParser()
-config.read("config.ini")
-TOKEN_DISCORD = config["DEFAULT"]["token_discord"]
-ID_GUILD = discord.Object(id=config["DEFAULT"]["id_guild_ghg"])
+TOKEN_DISCORD = os.getenv("TOKEN_DISCORD")
+ID_GUILD = discord.Object(id=os.getenv("TOKEN_GUILD"))
 
 web_links = {
     "home": "https://www.herwegh-gymnasium.de",

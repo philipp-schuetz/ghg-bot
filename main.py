@@ -1,14 +1,19 @@
-import lightbulb
+from typing import Optional
 import configparser
 import sqlite3
 import time
 from datetime import datetime
 
+import discord
+from discord import app_commands
+
+
+
+
 config = configparser.ConfigParser()
 config.read("config.ini")
-token_dicord = config["DEFAULT"]["token_discord"]
-
-bot = lightbulb.BotApp(token=token_dicord)
+TOKEN_DISCORD = config["DEFAULT"]["token_discord"]
+ID_GUILD = discord.Object(id=config["DEFAULT"]["id_guild_ghg"])
 
 web_links = {
     "home": "https://www.herwegh-gymnasium.de",
@@ -17,6 +22,7 @@ web_links = {
 
 con = sqlite3.connect("bot-database.db")
 cur = con.cursor()
+
 
 def get_events(cur):
     result = cur.execute("SELECT title, description, timestamp FROM events")
@@ -29,70 +35,98 @@ def get_events(cur):
             if isinstance(column, int):
                 column = datetime.fromtimestamp(column).strftime("%d/%m/%Y") 
             if i == 0 or i == 2:
-                column = "*" + column + "*"
+                column = "**" + column + "**"
             res_str += column
             res_str += " "
             i += 1
         res_str += "\n"
         i = 0
     
-    return res_str
+    if res_str != "":
+        return res_str
+    else:
+        return None
 
 def add_event(title:str, description:str, date:str, con, cur):
     timestamp = time.mktime(datetime.strptime(date, "%d/%m/%Y").timetuple())
-    cur.execute(f"INSERT INTO events (title, description, timestamp) VALUES (?, ?, ?)", (title, description, timestamp))
+    cur.execute("INSERT INTO events (title, description, timestamp) VALUES (?, ?, ?)", (title, description, timestamp))
     con.commit()
     
 def del_event(title, con, cur):
-    cur.execute(f"DELETE FROM events WHERE title=?", (title))
+    cur.execute("DELETE FROM events WHERE title=?", (title,))
     con.commit()
-    
-
-@bot.command
-@lightbulb.option("seite", "/help für info", type=str)
-@lightbulb.command("website", "Generiert Website Link")
-@lightbulb.implements(lightbulb.SlashCommand)
-async def website(ctx):
-    if ctx.options.seite in web_links:
-        website_link = web_links[ctx.options.seite]
-    else:
-        return "keine mögliche Option"
-    await ctx.respond(website_link)
 
 
-@bot.command
-@lightbulb.command("events", "Zeigt zukünftige Events an")
-@lightbulb.implements(lightbulb.SlashCommand)
-async def events(ctx):
-    response = get_events(cur)
-    await ctx.respond(response)
+class MyClient(discord.Client):
+    def __init__(self, *, intents: discord.Intents):
+        super().__init__(intents=intents)
+        self.tree = app_commands.CommandTree(self)
 
-@bot.command
-@lightbulb.option("title", "Event Titel", type=str)
-@lightbulb.option("description", "Event Beschreibung", type=str)
-@lightbulb.option("date", "Event Datum (Format: 01/01/2000))", type=str)
-@lightbulb.command("addevent", "Fügt Event hinzu")
-@lightbulb.implements(lightbulb.SlashCommand)
-async def addevent(ctx):
-    add_event(ctx.options.title, ctx.options.description, ctx.options.date, con, cur)
+    async def setup_hook(self):
+        self.tree.copy_global_to(guild=ID_GUILD)
+        await self.tree.sync(guild=ID_GUILD)
 
-@bot.command
-@lightbulb.option("title", "Event Titel", type=str)
-@lightbulb.command("delevent", "Löscht Event")
-@lightbulb.implements(lightbulb.SlashCommand)
-async def delevent(ctx):
-    del_event(ctx.options.title, con, cur)
-    await ctx.respond(f"Event '{ctx.options.title}' gelöscht")
 
-@bot.command
-@lightbulb.command("help", "hilfe zu commands")
-@lightbulb.implements(lightbulb.SlashCommand)
-async def help(ctx):
+intents = discord.Intents.default()
+client = MyClient(intents=intents)
+
+
+@client.event
+async def on_ready():
+    print(f'Logged in as {client.user} (ID: {client.user.id})')
+    print('------')
+
+@client.tree.command()
+async def help(interaction: discord.Interaction):
+    """Zeigt Hilfe an"""
     response = """
     /website:
     \u2022 home: Homepage
     \u2022 fehlzeiten: Fehlzeiten Formular
-    """
-    await ctx.respond(response)
 
-bot.run()
+    /events: Zeigt Events an
+    /addevent: Erstellt Event
+    /delevent: Löscht Event
+    """
+
+    embed = discord.Embed(title="Help", description=response, colour=discord.Color.green())
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+@client.tree.command()
+@app_commands.rename(site="seite")
+async def website(interaction: discord.Interaction, site:str):
+    """Generiert Website Link"""
+    if site in web_links:
+        website_link = web_links[site]
+    else:
+        return "keine mögliche Option"
+    await interaction.response.send_message(website_link, ephemeral=True)
+
+@client.tree.command()
+async def events(interaction: discord.Interaction):
+    """Zeigt zukünftige Events an"""
+    res = get_events(cur)
+    if res == None:
+        res = "Keine Events verfügbar."
+    embed = discord.Embed(title="Events", description=res, colour=discord.Color.green())
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+@client.tree.command()
+@app_commands.rename(title="titel")
+@app_commands.rename(description="beschreibung")
+@app_commands.rename(date="datum")
+@app_commands.describe(date="(01/01/2000)")
+async def addevent(interaction: discord.Interaction, title:str, description:str, date:str):
+    """Erstellt Event"""
+    add_event(title, description, date, con, cur)
+    await interaction.response.send_message(f"Event '{title}' erstellt.")
+
+@client.tree.command()
+@app_commands.rename(title="titel")
+async def delevent(interaction: discord.Interaction, title:str):
+    """Löscht Event"""
+    del_event(title, con, cur)
+    await interaction.response.send_message(f"Event '{title}' gelöscht.")
+
+
+client.run(TOKEN_DISCORD)

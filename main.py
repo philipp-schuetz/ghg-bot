@@ -10,7 +10,7 @@ TOKEN_DISCORD = os.getenv("TOKEN_DISCORD")
 ID_GUILD = discord.Object(id=os.getenv("ID_GUILD"))
 
 
-con = sqlite3.connect("bot-database.db")
+con = sqlite3.connect("/db/bot-database.db")
 cur = con.cursor()
 
 

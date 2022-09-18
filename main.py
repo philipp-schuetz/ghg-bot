@@ -6,8 +6,6 @@ from datetime import datetime
 import discord
 from discord import app_commands
 
-
-
 TOKEN_DISCORD = os.getenv("TOKEN_DISCORD")
 ID_GUILD = discord.Object(id=os.getenv("TOKEN_GUILD"))
 
@@ -16,12 +14,12 @@ web_links = {
     "fehlzeiten": "https://www.herwegh-gymnasium.de/organisation/formulare/schueler/Entschuldigungszettel.pdf",
 }
 
-con = sqlite3.connect("bot-database.db")
-cur = con.cursor()
+db_connection = sqlite3.connect("bot-database.db")
+db_cursor = db_connection.cursor()
 
 
-def get_events(cur):
-    result = cur.execute("SELECT title, description, timestamp FROM events")
+def get_events(cursor: sqlite3.Cursor):
+    result = cursor.execute("SELECT title, description, timestamp FROM events")
     res_list = result.fetchall()
 
     res_str = ""
@@ -29,7 +27,7 @@ def get_events(cur):
     for event in res_list:
         for column in event:
             if isinstance(column, int):
-                column = datetime.fromtimestamp(column).strftime("%d/%m/%Y") 
+                column = datetime.fromtimestamp(column).strftime("%d/%m/%Y")
             if i == 0 or i == 2:
                 column = "**" + column + "**"
             res_str += column
@@ -37,20 +35,22 @@ def get_events(cur):
             i += 1
         res_str += "\n"
         i = 0
-    
+
     if res_str != "":
         return res_str
     else:
         return None
 
-def add_event(title:str, description:str, date:str, con, cur):
+
+def add_event(title: str, description: str, date: str, connection: sqlite3.Connection, cursor: sqlite3.Cursor):
     timestamp = time.mktime(datetime.strptime(date, "%d/%m/%Y").timetuple())
-    cur.execute("INSERT INTO events (title, description, timestamp) VALUES (?, ?, ?)", (title, description, timestamp))
-    con.commit()
-    
-def del_event(title, con, cur):
-    cur.execute("DELETE FROM events WHERE title=?", (title,))
-    con.commit()
+    cursor.execute("INSERT INTO events (title, description, timestamp) VALUES (?, ?, ?)", (title, description, timestamp))
+    connection.commit()
+
+
+def del_event(title, connection: sqlite3.Connection, cursor: sqlite3.Cursor):
+    cursor.execute("DELETE FROM events WHERE title=?", (title,))
+    connection.commit()
 
 
 class MyClient(discord.Client):
@@ -72,6 +72,7 @@ async def on_ready():
     print(f'Logged in as {client.user} (ID: {client.user.id})')
     print('------')
 
+
 @client.tree.command()
 async def help(interaction: discord.Interaction):
     """Zeigt Hilfe an"""
@@ -88,9 +89,10 @@ async def help(interaction: discord.Interaction):
     embed = discord.Embed(title="Help", description=response, colour=discord.Color.green())
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
+
 @client.tree.command()
 @app_commands.rename(site="seite")
-async def website(interaction: discord.Interaction, site:str):
+async def website(interaction: discord.Interaction, site: str):
     """Generiert Website Link"""
     if site in web_links:
         website_link = web_links[site]
@@ -98,30 +100,33 @@ async def website(interaction: discord.Interaction, site:str):
         return "keine mögliche Option"
     await interaction.response.send_message(website_link, ephemeral=True)
 
+
 @client.tree.command()
 async def events(interaction: discord.Interaction):
     """Zeigt zukünftige Events an"""
-    res = get_events(cur)
-    if res == None:
-        res = "Keine Events verfügbar."
-    embed = discord.Embed(title="Events", description=res, colour=discord.Color.green())
+    result = get_events(db_cursor)
+    if result is None:
+        result = "Keine Events verfügbar."
+    embed = discord.Embed(title="Events", description=result, colour=discord.Color.green())
     await interaction.response.send_message(embed=embed, ephemeral=True)
+
 
 @client.tree.command()
 @app_commands.rename(title="titel")
 @app_commands.rename(description="beschreibung")
 @app_commands.rename(date="datum")
 @app_commands.describe(date="(01/01/2000)")
-async def addevent(interaction: discord.Interaction, title:str, description:str, date:str):
+async def addevent(interaction: discord.Interaction, title: str, description: str, date: str):
     """Erstellt Event"""
-    add_event(title, description, date, con, cur)
+    add_event(title, description, date, db_connection, db_cursor)
     await interaction.response.send_message(f"Event '{title}' erstellt.")
+
 
 @client.tree.command()
 @app_commands.rename(title="titel")
-async def delevent(interaction: discord.Interaction, title:str):
+async def delevent(interaction: discord.Interaction, title: str):
     """Löscht Event"""
-    del_event(title, con, cur)
+    del_event(title, db_connection, db_cursor)
     await interaction.response.send_message(f"Event '{title}' gelöscht.")
 
 

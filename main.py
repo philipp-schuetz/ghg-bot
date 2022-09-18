@@ -53,6 +53,17 @@ def del_event(title, connection: sqlite3.Connection, cursor: sqlite3.Cursor):
     connection.commit()
 
 
+class NotPermittedException(Exception):
+    pass
+
+
+async def check_admin_permission(interaction: discord.Interaction):
+    permissions = interaction.permissions
+    if not permissions.administrator:
+        await interaction.response.send_message("du bist nicht dazu berechtigt, diesen Befehl auszuführen", ephemeral=True)
+        raise NotPermittedException(f"'{interaction.user.name}' tried to execute '{interaction.command.name}'")
+
+
 class MyClient(discord.Client):
     def __init__(self, *, intents: discord.Intents):
         super().__init__(intents=intents)
@@ -118,6 +129,11 @@ async def events(interaction: discord.Interaction):
 @app_commands.describe(date="(01/01/2000)")
 async def addevent(interaction: discord.Interaction, title: str, description: str, date: str):
     """Erstellt Event"""
+    try:
+        await check_admin_permission(interaction)
+    except NotPermittedException as e:
+        print(e)    #TODO implement logging
+        return
     add_event(title, description, date, db_connection, db_cursor)
     await interaction.response.send_message(f"Event '{title}' erstellt.")
 
@@ -126,6 +142,11 @@ async def addevent(interaction: discord.Interaction, title: str, description: st
 @app_commands.rename(title="titel")
 async def delevent(interaction: discord.Interaction, title: str):
     """Löscht Event"""
+    try:
+        await check_admin_permission(interaction)
+    except NotPermittedException as e:
+        print(e)    #TODO implement logging
+        return
     del_event(title, db_connection, db_cursor)
     await interaction.response.send_message(f"Event '{title}' gelöscht.")
 

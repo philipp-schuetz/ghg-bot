@@ -9,10 +9,6 @@ from discord import app_commands
 TOKEN_DISCORD = os.getenv("TOKEN_DISCORD")
 ID_GUILD = discord.Object(id=os.getenv("TOKEN_GUILD"))
 
-web_links = {
-    "home": "https://www.herwegh-gymnasium.de",
-    "fehlzeiten": "https://www.herwegh-gymnasium.de/organisation/formulare/schueler/Entschuldigungszettel.pdf",
-}
 
 con = sqlite3.connect("bot-database.db")
 cur = con.cursor()
@@ -92,13 +88,13 @@ async def help(interaction: discord.Interaction):
 
 @client.tree.command()
 @app_commands.rename(site="seite")
-async def website(interaction: discord.Interaction, site: str):
+@app_commands.choices(site=[
+    app_commands.Choice(name="home", value="https://www.herwegh-gymnasium.de"),
+    app_commands.Choice(name="fehlzeiten", value="https://www.herwegh-gymnasium.de/organisation/formulare/schueler/Entschuldigungszettel.pdf")
+])
+async def website(interaction: discord.Interaction, site: app_commands.Choice[str]):
     """Generiert Website Link"""
-    if site in web_links:
-        website_link = web_links[site]
-    else:
-        return "keine mögliche Option"
-    await interaction.response.send_message(website_link, ephemeral=True)
+    await interaction.response.send_message(site.value, ephemeral=True)
 
 
 @client.tree.command()

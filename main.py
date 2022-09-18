@@ -7,7 +7,7 @@ import discord
 from discord import app_commands
 
 TOKEN_DISCORD = os.getenv("TOKEN_DISCORD")
-ID_GUILD = discord.Object(id=os.getenv("TOKEN_GUILD"))
+ID_GUILD = discord.Object(id=os.getenv("ID_GUILD"))
 
 
 con = sqlite3.connect("bot-database.db")

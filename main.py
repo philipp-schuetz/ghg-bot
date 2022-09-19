@@ -7,14 +7,10 @@ import discord
 from discord import app_commands
 
 TOKEN_DISCORD = os.getenv("TOKEN_DISCORD")
-ID_GUILD = discord.Object(id=os.getenv("TOKEN_GUILD"))
+ID_GUILD = discord.Object(id=os.getenv("ID_GUILD"))
 
-web_links = {
-    "home": "https://www.herwegh-gymnasium.de",
-    "fehlzeiten": "https://www.herwegh-gymnasium.de/organisation/formulare/schueler/Entschuldigungszettel.pdf",
-}
 
-db_connection = sqlite3.connect("bot-database.db")
+db_connection = sqlite3.connect("/db/bot-database.db")
 db_cursor = db_connection.cursor()
 
 
@@ -38,6 +34,7 @@ def add_event(title: str, description: str, date: str, connection: sqlite3.Conne
 def del_event(title, connection: sqlite3.Connection, cursor: sqlite3.Cursor):
     cursor.execute("DELETE FROM events WHERE title=?", (title,))
     connection.commit()
+
 
 
 class MyClient(discord.Client):
@@ -79,13 +76,14 @@ async def help(interaction: discord.Interaction):
 
 @client.tree.command()
 @app_commands.rename(site="seite")
-async def website(interaction: discord.Interaction, site: str):
+@app_commands.choices(site=[
+    app_commands.Choice(name="home", value="https://www.herwegh-gymnasium.de"),
+    app_commands.Choice(name="fehlzeiten", value="https://www.herwegh-gymnasium.de/organisation/formulare/schueler/Entschuldigungszettel.pdf")
+])
+async def website(interaction: discord.Interaction, site: app_commands.Choice[str]):
     """Generiert Website Link"""
-    if site in web_links:
-        website_link = web_links[site]
-    else:
-        return "keine mögliche Option"
-    await interaction.response.send_message(website_link, ephemeral=True)
+    await interaction.response.send_message(site.value, ephemeral=True)
+
 
 
 @client.tree.command()
@@ -97,9 +95,7 @@ async def events(interaction: discord.Interaction):
 
 
 @client.tree.command()
-@app_commands.rename(title="titel")
-@app_commands.rename(description="beschreibung")
-@app_commands.rename(date="datum")
+@app_commands.rename(title="titel", description="beschribung", date="datum")
 @app_commands.describe(date="(01/01/2000)")
 async def addevent(interaction: discord.Interaction, title: str, description: str, date: str):
     """Erstellt Event"""

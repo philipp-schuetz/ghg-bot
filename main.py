@@ -18,28 +18,15 @@ db_connection = sqlite3.connect("bot-database.db")
 db_cursor = db_connection.cursor()
 
 
-def get_events(cursor: sqlite3.Cursor):
+def get_events(cursor: sqlite3.Cursor) -> str:
     result = cursor.execute("SELECT title, description, timestamp FROM events")
     res_list = result.fetchall()
 
-    res_str = ""
-    i = 0
+    events = []
     for event in res_list:
-        for column in event:
-            if isinstance(column, int):
-                column = datetime.fromtimestamp(column).strftime("%d/%m/%Y")
-            if i == 0 or i == 2:
-                column = "**" + column + "**"
-            res_str += column
-            res_str += " "
-            i += 1
-        res_str += "\n"
-        i = 0
+        events.append(f"**{event[0]}** {event[1]} **<t:{event[2]}:D>**")
 
-    if res_str != "":
-        return res_str
-    else:
-        return None
+    return "\n".join(events) if len(events) > 0 else "keine Events verfügbar"
 
 
 def add_event(title: str, description: str, date: str, connection: sqlite3.Connection, cursor: sqlite3.Cursor):
@@ -105,8 +92,6 @@ async def website(interaction: discord.Interaction, site: str):
 async def events(interaction: discord.Interaction):
     """Zeigt zukünftige Events an"""
     result = get_events(db_cursor)
-    if result is None:
-        result = "Keine Events verfügbar."
     embed = discord.Embed(title="Events", description=result, colour=discord.Color.green())
     await interaction.response.send_message(embed=embed, ephemeral=True)
 

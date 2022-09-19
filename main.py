@@ -6,17 +6,11 @@ from datetime import datetime
 import discord
 from discord import app_commands
 
-
-
 TOKEN_DISCORD = os.getenv("TOKEN_DISCORD")
-ID_GUILD = discord.Object(id=os.getenv("TOKEN_GUILD"))
+ID_GUILD = discord.Object(id=os.getenv("ID_GUILD"))
 
-web_links = {
-    "home": "https://www.herwegh-gymnasium.de",
-    "fehlzeiten": "https://www.herwegh-gymnasium.de/organisation/formulare/schueler/Entschuldigungszettel.pdf",
-}
 
-con = sqlite3.connect("bot-database.db")
+con = sqlite3.connect("/db/bot-database.db")
 cur = con.cursor()
 
 
@@ -29,7 +23,7 @@ def get_events(cur):
     for event in res_list:
         for column in event:
             if isinstance(column, int):
-                column = datetime.fromtimestamp(column).strftime("%d/%m/%Y") 
+                column = datetime.fromtimestamp(column).strftime("%d/%m/%Y")
             if i == 0 or i == 2:
                 column = "**" + column + "**"
             res_str += column
@@ -37,17 +31,19 @@ def get_events(cur):
             i += 1
         res_str += "\n"
         i = 0
-    
+
     if res_str != "":
         return res_str
     else:
         return None
 
-def add_event(title:str, description:str, date:str, con, cur):
+
+def add_event(title: str, description: str, date: str, con, cur):
     timestamp = time.mktime(datetime.strptime(date, "%d/%m/%Y").timetuple())
     cur.execute("INSERT INTO events (title, description, timestamp) VALUES (?, ?, ?)", (title, description, timestamp))
     con.commit()
-    
+
+
 def del_event(title, con, cur):
     cur.execute("DELETE FROM events WHERE title=?", (title,))
     con.commit()
@@ -72,6 +68,7 @@ async def on_ready():
     print(f'Logged in as {client.user} (ID: {client.user.id})')
     print('------')
 
+
 @client.tree.command()
 async def help(interaction: discord.Interaction):
     """Zeigt Hilfe an"""
@@ -88,15 +85,17 @@ async def help(interaction: discord.Interaction):
     embed = discord.Embed(title="Help", description=response, colour=discord.Color.green())
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
+
 @client.tree.command()
 @app_commands.rename(site="seite")
-async def website(interaction: discord.Interaction, site:str):
+@app_commands.choices(site=[
+    app_commands.Choice(name="home", value="https://www.herwegh-gymnasium.de"),
+    app_commands.Choice(name="fehlzeiten", value="https://www.herwegh-gymnasium.de/organisation/formulare/schueler/Entschuldigungszettel.pdf")
+])
+async def website(interaction: discord.Interaction, site: app_commands.Choice[str]):
     """Generiert Website Link"""
-    if site in web_links:
-        website_link = web_links[site]
-    else:
-        return "keine mögliche Option"
-    await interaction.response.send_message(website_link, ephemeral=True)
+    await interaction.response.send_message(site.value, ephemeral=True)
+
 
 @client.tree.command()
 async def events(interaction: discord.Interaction):
@@ -107,19 +106,19 @@ async def events(interaction: discord.Interaction):
     embed = discord.Embed(title="Events", description=res, colour=discord.Color.green())
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
+
 @client.tree.command()
-@app_commands.rename(title="titel")
-@app_commands.rename(description="beschreibung")
-@app_commands.rename(date="datum")
+@app_commands.rename(title="titel", description="beschribung", date="datum")
 @app_commands.describe(date="(01/01/2000)")
-async def addevent(interaction: discord.Interaction, title:str, description:str, date:str):
+async def addevent(interaction: discord.Interaction, title: str, description: str, date: str):
     """Erstellt Event"""
     add_event(title, description, date, con, cur)
     await interaction.response.send_message(f"Event '{title}' erstellt.")
 
+
 @client.tree.command()
 @app_commands.rename(title="titel")
-async def delevent(interaction: discord.Interaction, title:str):
+async def delevent(interaction: discord.Interaction, title: str):
     """Löscht Event"""
     del_event(title, con, cur)
     await interaction.response.send_message(f"Event '{title}' gelöscht.")

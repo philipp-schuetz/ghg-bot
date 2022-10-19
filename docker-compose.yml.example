@@ -1,0 +1,18 @@
+---
+version: '1.0'
+services:
+  ghg-bot:
+    image: ghg-bot:latest
+    container_name: ghg-bot
+    environment:
+      - TZ=Europe/Berlin
+      - TOKEN_DISCORD=
+      - ID_GUILD=
+    volumes:
+      - ./db:/db
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 400m
